@@ -1,0 +1,2 @@
+## Introduction
+SciQAgent is an advanced AI-driven system designed to facilitate multi-turn conversations on scientific topics by leveraging research publications. Utilizing a Retrieval-Augmented Generation (RAG) architecture, SciQAgent retrieves, processes, and synthesizes information from relevant scientific literature to provide accurate and context-aware responses. Users can engage in interactive discussions, ask follow-up questions, request clarifications, and provide feedback, ensuring a dynamic and informative experience.
