@@ -6,7 +6,7 @@ class QueryExpansionSignature(dspy.Signature):
     """Signature for expanding a scientific query."""
     chat_history: str = dspy.InputField(desc="The conversation history with the user. The last message should be the user's query")
     expanded_queries: List[str] = dspy.OutputField(desc="Three independent queries. Should be keyword style queries, not full sentences, for searching on pubmed and arxiv, etc. The topics should follow the current conversation provided in chat_history")
-
+    updated_query: str = dspy.OutputField(desc="The updated query based on the conversation history. This should be a full sentence, not a keyword style query, to be used for similarity search in the vectorstore, if no update is needed, return empty string")
 
 class SourceSelectionSignature(dspy.Signature):
     """Signature for selecting the source to search for papers."""

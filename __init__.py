@@ -9,7 +9,7 @@ def setup_logger():
     and ensures that duplicate handlers are not added.
     """
     # Create a custom logger
-    logger = logging.getLogger('rag_agent')
+    logger = logging.getLogger('SciQAgent')
 
     # Set the level of the logger to INFO
     logger.setLevel(logging.INFO)

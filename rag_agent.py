@@ -14,10 +14,10 @@ from search_agent import SearchAgent
 from dspy_signatures import AnswerGenerationSignature, QueryRouterSignature, AnswerRefinerSignature, AnswerAssessorSignature
 
 
-logger = logging.getLogger('rag_agent')
+logger = logging.getLogger('SciQAgent')
 
 
-class RAGAgentState(TypedDict):
+class SciQAgentState(TypedDict):
     """State dictionary for the RAG Agent, holding conversation context and relevant information."""
     query: str  # User's query in the current conversation
     retrieved_context: str  # The context retrieved from documents relevant to the query
@@ -26,7 +26,7 @@ class RAGAgentState(TypedDict):
     messages: Annotated[List, add_messages]  # History of conversation messages with added context
 
 
-class RAGAgent:
+class SciQAgent:
     """Agent for multi-turn scientific conversations, utilizing retrieval-augmented generation (RAG) for answering queries."""
 
     def __init__(self):
@@ -44,30 +44,36 @@ class RAGAgent:
         This graph defines the steps for retrieving relevant documents, generating answers,
         assessing feedback, and refining the answer if necessary.
         """
-        def search(state: RAGAgentState):
+        def search(state: SciQAgentState):
             """
             Search for relevant scientific documents using the search agent.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, containing the query and conversation history.
+                state (SciQAgentState): The current state of the RAG agent, containing the query and conversation history.
             """
             logger.info("\n\n***SEARCH***")
             full_conversation = "\n".join([msg.content for msg in state['messages']])
-            paper_list = SearchAgent.search(state['query'], full_conversation)
+            paper_list, updated_query = SearchAgent.search(state['query'], full_conversation)
 
             # Process URLs to extract images and chunked text and add embeddings to vectorstore
             self.db.process_urls_parallel([paper['Link'] for paper in paper_list if paper['Link']])
             self.db.abstracts.extend([paper['Abstract'] for paper in paper_list if paper['Abstract']])
 
             logger.info(f"Processed {len(paper_list)} documents from search agent")
+
+            if updated_query:
+                logger.info(f"Updated query: {updated_query}")
+                logger.info("***END_SEARCH***\n\n")
+                return {'query': updated_query}
+
             logger.info("***END_SEARCH***\n\n")
 
-        def route_query(state: RAGAgentState):
+        def route_query(state: SciQAgentState):
             """
             Routes the query to either the vectorstore or the search agent based on the current paperDB contents.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent
+                state (SciQAgentState): The current state of the RAG agent
 
             Returns:
                 str: The result of routing the query, determining the next step.
@@ -85,12 +91,12 @@ class RAGAgent:
             logger.info("***END_ROUTE_QUERY***\n\n")
             return output['output']
 
-        def generate_feedback(state: RAGAgentState):
+        def generate_feedback(state: SciQAgentState):
             """
             Generates feedback on the answer based on the context and answer's quality.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, including the query, retrieved context, and generated answer.
+                state (SciQAgentState): The current state of the RAG agent, including the query, retrieved context, and generated answer.
 
             Returns:
                 dict: Feedback about the answer (e.g., inaccuracies or hallucinations).
@@ -115,12 +121,12 @@ class RAGAgent:
 
             return {'feedback': feedback}
 
-        def assess_feedback(state: RAGAgentState):
+        def assess_feedback(state: SciQAgentState):
             """
             Assesses the generated feedback and decides whether the answer should be refined or if the process is complete.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, containing feedback information.
+                state (SciQAgentState): The current state of the RAG agent, containing feedback information.
 
             Returns:
                 str: "refine" to trigger answer refinement or "end" to end the process.
@@ -136,12 +142,12 @@ class RAGAgent:
                 logger.info("***END_ASSESS_FEEDBACK***\n\n")
                 return "end"
 
-        def refine_answer(state: RAGAgentState):
+        def refine_answer(state: SciQAgentState):
             """
             Refines the generated answer using the feedback to improve its quality.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, including the query, context, generated answer, and feedback.
+                state (SciQAgentState): The current state of the RAG agent, including the query, context, generated answer, and feedback.
 
             Returns:
                 dict: The refined answer.
@@ -159,12 +165,12 @@ class RAGAgent:
 
             return {'generated_answer': answer}
 
-        def retrieve_documents(state: RAGAgentState):
+        def retrieve_documents(state: SciQAgentState):
             """
             Retrieve relevant documents from the database based on the user's query.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, including the user's query.
+                state (SciQAgentState): The current state of the RAG agent, including the user's query.
 
             Returns:
                 dict: The context of retrieved documents.
@@ -177,12 +183,12 @@ class RAGAgent:
 
             return {'retrieved_context': context}
 
-        def generate_answer(state: RAGAgentState):
+        def generate_answer(state: SciQAgentState):
             """
             Generates an answer based on the retrieved context and previous conversation history.
 
             Args:
-                state (RAGAgentState): The current state of the RAG agent, including the user's query and conversation history.
+                state (SciQAgentState): The current state of the RAG agent, including the user's query and conversation history.
 
             Returns:
                 dict: The generated answer and updated message history.
@@ -206,7 +212,7 @@ class RAGAgent:
 
         print("Creating RAG Agent graph...")
         # Define graph workflow
-        workflow = StateGraph(RAGAgentState)
+        workflow = StateGraph(SciQAgentState)
         workflow.add_node("search", search)
         workflow.add_node("retrieve", retrieve_documents)
         workflow.add_node("generate_answer", generate_answer)
@@ -244,15 +250,15 @@ class RAGAgent:
 
         return workflow.compile()
 
-    def invoke(self, state: RAGAgentState) -> RAGAgentState:
+    def invoke(self, state: SciQAgentState) -> SciQAgentState:
         """
         Invoke the RAG agent for multi-turn conversations.
 
         Args:
-            state (RAGAgentState): The current state of the agent, which is updated after each turn.
+            state (SciQAgentState): The current state of the agent, which is updated after each turn.
 
         Returns:
-            RAGAgentState: The updated state after processing the current query.
+            SciQAgentState: The updated state after processing the current query.
         """
         # Initialize or maintain the state across turns
         return self.graph.invoke(state)

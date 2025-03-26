@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from rag_agent import RAGAgent
+from rag_agent import SciQAgent
 from __init__ import setup_logger
 
 # Initialize logger
@@ -63,9 +63,9 @@ if not st.session_state.api_key_set:
     else:
         st.error("⚠️ Please enter a valid API Key.")
 else:
-    # Persist RAGAgent instance
+    # Persist SciQAgent instance
     if "rag_agent" not in st.session_state:
-        st.session_state.rag_agent = RAGAgent()
+        st.session_state.rag_agent = SciQAgent()
 
     # Initialize conversation state if not already set
     if "rag_state" not in st.session_state:

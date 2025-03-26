@@ -7,7 +7,7 @@ import dspy
 from dspy_signatures import QueryExpansionSignature, RelevanceSignature, SourceSelectionSignature
 from search_utils import ArxivSearch, BioRxivSearch, PubMedSearch
 
-logger = logging.getLogger('rag_agent')
+logger = logging.getLogger('SciQAgent')
 
 MAX_PAPERS = 5  # Maximum number of papers to return for the search
 
@@ -22,7 +22,9 @@ def expand_query(conversation: str, model: str = "openai/gpt-4o-mini", temperatu
         temperature: Temperature setting for the model's creativity.
 
     Returns:
-        A list of three expanded versions of the original query.
+        A dictionary containing:
+            - expanded_queries: List of three independent search terms.
+            - updated_query: An updated query based on the conversation history.
     """
     # Set up the LLM
     lm = dspy.LM(model, api_key=os.getenv("OPENAI_API_KEY"), temperature=temperature)
@@ -33,7 +35,7 @@ def expand_query(conversation: str, model: str = "openai/gpt-4o-mini", temperatu
     response = expander(chat_history=conversation)
     logger.info(f"expand_query COT: {response}")
 
-    return response.expanded_queries
+    return response
 
 
 def rank_papers_with_llm(papers: List[Dict[str, str]], query: str, model: str = "gpt-4o-mini") -> List[Dict[str, str]]:
@@ -84,7 +86,12 @@ class SearchAgent:
         """ Process the query through the search agent workflow """
         # Step 1: Expand the original query using the QueryExpansionTool
         try:
-            expanded_queries = expand_query(conversation)
+            response = expand_query(conversation)
+            expanded_queries = response['expanded_queries']
+            updated_query = response['updated_query']
+            if updated_query:
+                query = updated_query
+
         except Exception as e:
             logging.error(f"Error during query expansion: {e}")
             return []
@@ -121,4 +128,4 @@ class SearchAgent:
         all_results = rank_papers_with_llm(all_results, query)
 
         # Return top 5 overall results based on LLM relevance scoring
-        return all_results[:MAX_PAPERS]
+        return all_results[:MAX_PAPERS], updated_query
