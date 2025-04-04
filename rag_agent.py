@@ -212,6 +212,7 @@ class SciQAgent:
                 query=state['query'],
                 context=full_conversation + "\n******\n" + state['retrieved_context']
             )['answer']
+            logger.info(f"Generated answer: {answer}")
 
             logger.info("\n***END_GENERATE_ANSWER***\n\n")
 
