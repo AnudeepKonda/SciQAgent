@@ -3,6 +3,7 @@ import os
 from typing import Dict, List
 
 import dspy
+import time
 
 from dspy_signatures import QueryExpansionSignature, RelevanceSignature, SourceSelectionSignature
 from search_utils import ArxivSearch, BioRxivSearch, PubMedSearch
@@ -83,7 +84,22 @@ class SearchAgent:
     """
     @staticmethod
     def search(query: str, conversation: str, max_results: int = 5) -> List[Dict[str, str]]:
-        """ Process the query through the search agent workflow """
+        """
+        Executes a search workflow to retrieve and rank research papers based on a given query.
+
+        Args:
+            query (str): The original search query provided by the user.
+            conversation (str): Conversation history that lead to the user question.
+            max_results (int, optional): The maximum number of results to retrieve. Defaults to 5.
+
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries containing the top-ranked research papers. 
+                                  Each dictionary includes metadata such as title, authors, and abstract.
+            str: The updated query after query expansion, if applicable.
+
+        Raises:
+            Exception: Logs and handles exceptions that occur during query expansion or search processes.
+        """
         # Step 1: Expand the original query using the QueryExpansionTool
         try:
             response = expand_query(conversation)
@@ -108,6 +124,7 @@ class SearchAgent:
             logger.info(f"\nSearching for papers with expanded query: {expanded_query}")
 
             source = source_selector(query=expanded_query)['source']
+            results = None
 
             # Step 2: Use arXiv or PubMed or BioRxiv search tools to get results
             if source.lower() == 'arxiv':
@@ -120,6 +137,7 @@ class SearchAgent:
             # Combine results from both tools
             if results and isinstance(results, list):
                 all_results.extend(results)
+            time.sleep(.5)
 
         logger.info(f"\nTotal results: {len(all_results), source}")
 

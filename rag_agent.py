@@ -51,7 +51,7 @@ class SciQAgent:
             Args:
                 state (SciQAgentState): The current state of the RAG agent, containing the query and conversation history.
             """
-            logger.info("\n\n***SEARCH***")
+            logger.info("\n\n***SEARCH***\n")
             full_conversation = "\n".join([msg.content for msg in state['messages']])
             paper_list, updated_query = SearchAgent.search(state['query'], full_conversation)
 
@@ -63,10 +63,10 @@ class SciQAgent:
 
             if updated_query:
                 logger.info(f"Updated query: {updated_query}")
-                logger.info("***END_SEARCH***\n\n")
+                logger.info("\n***END_SEARCH***\n\n")
                 return {'query': updated_query}
 
-            logger.info("***END_SEARCH***\n\n")
+            logger.info("\n***END_SEARCH***\n\n")
 
         def route_query(state: SciQAgentState):
             """
@@ -78,9 +78,9 @@ class SciQAgent:
             Returns:
                 str: The result of routing the query, determining the next step.
             """
-            logger.info("\n\n***ROUTE_QUERY***")
+            logger.info("\n\n***ROUTE_QUERY***\n")
             abstract_text = "\n******\n".join(self.db.abstracts)
-            print(f"Abstracts: {abstract_text}")
+            # print(f"Abstracts: {abstract_text}")
 
             lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.)
             dspy.configure(lm=lm)
@@ -88,7 +88,7 @@ class SciQAgent:
             query_router = dspy.ChainOfThought(QueryRouterSignature)
             output = query_router(query=state['query'], abstracts=abstract_text)
             logger.info(f"Query routing result: {output}")
-            logger.info("***END_ROUTE_QUERY***\n\n")
+            logger.info("\n***END_ROUTE_QUERY***\n\n")
             return output['output']
 
         def generate_feedback(state: SciQAgentState):
@@ -101,7 +101,7 @@ class SciQAgent:
             Returns:
                 dict: Feedback about the answer (e.g., inaccuracies or hallucinations).
             """
-            logger.info("\n\n***GENERATE_FEEDBACK***")
+            logger.info("\n\n***GENERATE_FEEDBACK***\n")
             lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.)
             dspy.configure(lm=lm)
             answer_assessor = dspy.Predict(AnswerAssessorSignature)
@@ -109,15 +109,15 @@ class SciQAgent:
 
             feedback = ""
             if assessment['is_hallucination']:
-                feedback += "The generated answer contains hallucinations. "
+                feedback += "Hallucinations: \n " + assessment['is_hallucination'] + "\n"
             if assessment['is_inaccurate']:
-                feedback += "The generated answer contains inaccuracies. "
+                feedback += "Inaccuracies: \n " + assessment['is_inaccurate'] + "\n"
 
             if not feedback:
                 feedback = "The generated answer is accurate and does not contain hallucinations."
 
             logger.info(f"Feedback: {feedback}")
-            logger.info("END_GENERATE_FEEDBACK")
+            logger.info("\n***END_GENERATE_FEEDBACK***\n\n")
 
             return {'feedback': feedback}
 
@@ -131,15 +131,15 @@ class SciQAgent:
             Returns:
                 str: "refine" to trigger answer refinement or "end" to end the process.
             """
-            logger.info("\n\n***ASSESS_FEEDBACK***")
+            logger.info("\n\n***ASSESS_FEEDBACK***\n")
             if "The generated answer contains hallucinations" in state['feedback'] or \
                 "The generated answer contains inaccuracies" in state['feedback']:
                 logger.info("Refine the answer")
-                logger.info("***END_ASSESS_FEEDBACK***\n\n")
+                logger.info("\n***END_ASSESS_FEEDBACK***\n\n")
                 return "refine"
             else:
                 logger.info("END")
-                logger.info("***END_ASSESS_FEEDBACK***\n\n")
+                logger.info("\n***END_ASSESS_FEEDBACK***\n\n")
                 return "end"
 
         def refine_answer(state: SciQAgentState):
@@ -152,7 +152,7 @@ class SciQAgent:
             Returns:
                 dict: The refined answer.
             """
-            logger.info("\n\n***REFINE_ANSWER***")
+            logger.info("\n\n***REFINE_ANSWER***\n")
             lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.7)
             dspy.configure(lm=lm)
             answer_refiner = dspy.Predict(AnswerRefinerSignature)
@@ -161,7 +161,7 @@ class SciQAgent:
                                     generated_answer=state['generated_answer'],
                                     feedback=state['feedback'])['refined_answer']
             logger.info(f"Refined answer: {answer}")
-            logger.info("***END_REFINE_ANSWER***\n\n")
+            logger.info("\n***END_REFINE_ANSWER***\n\n")
 
             return {'generated_answer': answer}
 
@@ -175,11 +175,12 @@ class SciQAgent:
             Returns:
                 dict: The context of retrieved documents.
             """
-            logger.info("\n\n***RETRIEVE_DOCUMENTS***")
+            logger.info("\n\n***RETRIEVE_DOCUMENTS***\n")
             retrieved_docs = self.db.retriever.invoke(state['query'])
 
             context = "\n******\n".join([f"""SOURCE_ID: {doc.metadata['doc_id']},{doc.metadata['page'] if 'page' in doc.metadata else ""}\nLINK: {doc.metadata['source']}\nCONTENT: {doc.page_content}""" for doc in retrieved_docs])
-            logger.info("***END_RETRIEVE_DOCUMENTS******\n\n")
+            logger.info(f"Successfully retrieved {len(retrieved_docs)} documents from the vectorstore.")
+            logger.info("\n***END_RETRIEVE_DOCUMENTS******\n\n")
 
             return {'retrieved_context': context}
 
@@ -193,11 +194,11 @@ class SciQAgent:
             Returns:
                 dict: The generated answer and updated message history.
             """
-            logger.info("\n\n***GENERATE_ANSWER***")
+            logger.info("\n\n***GENERATE_ANSWER***\n")
             full_conversation = "\n".join([msg.content for msg in state['messages']])
 
             # Use DSPy to generate an answer based on the updated context
-            lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.5)
+            lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.1)
             dspy.configure(lm=lm)
 
             answer_generator = dspy.Predict(AnswerGenerationSignature)
@@ -206,7 +207,7 @@ class SciQAgent:
                 context=full_conversation + "\n******\n" + state['retrieved_context']
             )['answer']
 
-            logger.info("***END_GENERATE_ANSWER***\n\n")
+            logger.info("\n***END_GENERATE_ANSWER***\n\n")
 
             return {'generated_answer': answer, "messages": [{"role": "assistant", "content": answer}]}
 

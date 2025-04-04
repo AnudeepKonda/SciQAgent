@@ -67,7 +67,7 @@ class PubMedSearch:
         search_url = f"{PubMedSearch.BASE_URL}esearch.fcgi"
         params = {
             "db": "pubmed",
-            "term": query,
+            "term": query+"[Title:~2]",
             "retmode": "xml",
             "retmax": max_results
         }

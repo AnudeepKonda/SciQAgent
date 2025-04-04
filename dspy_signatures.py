@@ -5,7 +5,7 @@ import dspy
 class QueryExpansionSignature(dspy.Signature):
     """Signature for expanding a scientific query."""
     chat_history: str = dspy.InputField(desc="The conversation history with the user. The last message should be the user's query")
-    expanded_queries: List[str] = dspy.OutputField(desc="Three independent queries. Should be keyword style queries, not full sentences, for searching on pubmed and arxiv, etc. The topics should follow the current conversation provided in chat_history")
+    expanded_queries: List[str] = dspy.OutputField(desc="Ten independent queries. Should be keyword style queries, not full sentences, for searching on pubmed and arxiv, etc. The topics should follow the current conversation provided in chat_history")
     updated_query: str = dspy.OutputField(desc="The updated query based on the conversation history. This should be a full sentence, not a keyword style query, to be used for similarity search in the vectorstore, if no update is needed, return empty string")
 
 class SourceSelectionSignature(dspy.Signature):
@@ -35,8 +35,9 @@ class AnswerGenerationSignature(dspy.Signature):
     query: str = dspy.InputField(desc="The user's query")
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
     answer: str = dspy.OutputField(desc="The generated answer in markdown format based on the retrieved context and feedback. \
-                                         Answer should have bullet point for key information with appropriate citation for every bullet \
-                                        - strictly use provided SOURCE_ID for each CONTENT as the citation label, the LINK as the hyperlink")
+                                        Answer should have bullet points for key information with appropriate citation for every bullet, \
+                                        strictly use provided SOURCE_ID of each CONTENT as the citation label with the LINK as the hyperlink, eg: [source_id] \
+                                        It should look visually good and be easy to read.")
 
 
 class AnswerRefinerSignature(dspy.Signature):
@@ -45,7 +46,7 @@ class AnswerRefinerSignature(dspy.Signature):
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
     generated_answer: str = dspy.InputField(desc="The generated answer from the previous step")
     feedback: str = dspy.InputField(desc="Feedback for refining the current answer")
-    refined_answer: str = dspy.OutputField(desc="The refined answer based on the feedback given the context and previous answer")
+    refined_answer: str = dspy.OutputField(desc="The refined answer based on the feedback given the context and previous answer. You should only output markdown format. Remeber to give a bullet point style answer with appropriate citation for every bullet - strictly use provided SOURCE_ID for each CONTENT as the citation label, the LINK as the hyperlink")
 
 
 class AnswerAssessorSignature(dspy.Signature):
@@ -54,5 +55,5 @@ class AnswerAssessorSignature(dspy.Signature):
     query: str = dspy.InputField(desc="The user's query")
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
     generated_answer: str = dspy.InputField(desc="The generated answer from the previous step")
-    is_hallucination: bool = dspy.OutputField(desc="Whether the generated answer contains hallucinations or not")
-    is_inaccurate: bool = dspy.OutputField(desc="Whether the generated answer contains inaccuracies or not")
+    is_hallucination: str = dspy.OutputField(desc="Whether the generated answer contains hallucinations or not, if yes, output the hallucinated content")
+    is_inaccurate: str = dspy.OutputField(desc="Whether the generated answer contains inaccuracies or not, if yes, output the inaccurate content")
