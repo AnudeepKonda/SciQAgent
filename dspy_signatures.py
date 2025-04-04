@@ -34,9 +34,9 @@ class AnswerGenerationSignature(dspy.Signature):
     """Signature for generating an answer based on the retrieved context."""
     query: str = dspy.InputField(desc="The user's query")
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
-    answer: str = dspy.OutputField(desc="The generated answer in markdown format based on the retrieved context and feedback. \
+    answer: str = dspy.OutputField(desc="The generated answer in markdown format based on the retrieved context. \
                                         Answer should have bullet points for key information with appropriate citation for every bullet, \
-                                        strictly use provided SOURCE_ID of each CONTENT as the citation label with the LINK as the hyperlink, eg: [source_id] \
+                                        strictly use provided SOURCE_ID of each CONTENT in the context as the citation label with the LINK as the hyperlink, eg: [source_id] \
                                         It should look visually good and be easy to read.")
 
 
@@ -46,7 +46,10 @@ class AnswerRefinerSignature(dspy.Signature):
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
     generated_answer: str = dspy.InputField(desc="The generated answer from the previous step")
     feedback: str = dspy.InputField(desc="Feedback for refining the current answer")
-    refined_answer: str = dspy.OutputField(desc="The refined answer based on the feedback given the context and previous answer. You should only output markdown format. Remeber to give a bullet point style answer with appropriate citation for every bullet - strictly use provided SOURCE_ID for each CONTENT as the citation label, the LINK as the hyperlink")
+    refined_answer: str = dspy.OutputField(desc="The refined answer based on the feedback, the context and previous answer. \
+                                           You should only output markdown format. Answer should have bullet points for key information with appropriate citation for every bullet, \
+                                           strictly use provided SOURCE_ID of each CONTENT in the context as the citation label with the LINK as the hyperlink, eg: [source_id] \
+                                           It should look visually good and be easy to read.")
 
 
 class AnswerAssessorSignature(dspy.Signature):
@@ -55,5 +58,12 @@ class AnswerAssessorSignature(dspy.Signature):
     query: str = dspy.InputField(desc="The user's query")
     context: str = dspy.InputField(desc="The context retrieved from the vectorstore or search agent")
     generated_answer: str = dspy.InputField(desc="The generated answer from the previous step")
-    is_hallucination: str = dspy.OutputField(desc="Whether the generated answer contains hallucinations or not, if yes, output the hallucinated content")
-    is_inaccurate: str = dspy.OutputField(desc="Whether the generated answer contains inaccuracies or not, if yes, output the inaccurate content")
+    is_hallucination: str = dspy.OutputField(desc="Whether the generated answer contains hallucinations or not, if yes, output the hallucinated content, if no, you should only output an empty string")
+    is_inaccurate: str = dspy.OutputField(desc="Whether the generated answer contains inaccuracies or not, if yes, output the inaccurate content, if no, you should only output an empty string")
+
+
+class FeedbackAssessorSignature(dspy.Signature):
+    """Signature for assessing the generated answer.
+    Check for hallucinations and inaccuracies"""
+    feedback: str = dspy.InputField(desc="Feedback on the current answer")
+    output: Literal['refine', 'end'] = dspy.OutputField(desc="If the feedback suggests that the answe needs to be refined, output 'refine'. If the feedback suggests that the answer is good, even if it might be insufficient, output 'end'.")

@@ -92,6 +92,7 @@ else:
         st.session_state.rag_state["retrieved_context"] = ""
         st.session_state.rag_state["feedback"] = ""
         st.session_state.rag_state["generated_answer"] = ""
+        st.session_state.rag_state["refinement_count"] = 0
 
         st.session_state.rag_state["messages"].append({"role": "user", "content": user_input})
 

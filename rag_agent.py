@@ -11,7 +11,7 @@ from langgraph.graph.message import add_messages
 
 from paper_db import paperDB
 from search_agent import SearchAgent
-from dspy_signatures import AnswerGenerationSignature, QueryRouterSignature, AnswerRefinerSignature, AnswerAssessorSignature
+from dspy_signatures import AnswerGenerationSignature, QueryRouterSignature, AnswerRefinerSignature, AnswerAssessorSignature, FeedbackAssessorSignature
 
 
 logger = logging.getLogger('SciQAgent')
@@ -24,6 +24,7 @@ class SciQAgentState(TypedDict):
     generated_answer: str  # The answer generated based on the retrieved context
     feedback: str  # Feedback for refining the current answer (e.g., for hallucinations, inaccuracies)
     messages: Annotated[List, add_messages]  # History of conversation messages with added context
+    refinement_count: int  # Number of times the answer has been refined
 
 
 class SciQAgent:
@@ -132,15 +133,19 @@ class SciQAgent:
                 str: "refine" to trigger answer refinement or "end" to end the process.
             """
             logger.info("\n\n***ASSESS_FEEDBACK***\n")
-            if "The generated answer contains hallucinations" in state['feedback'] or \
-                "The generated answer contains inaccuracies" in state['feedback']:
-                logger.info("Refine the answer")
-                logger.info("\n***END_ASSESS_FEEDBACK***\n\n")
-                return "refine"
-            else:
-                logger.info("END")
+            if state["refinement_count"] >= 3:
+                logger.info("Refinement limit reached. Ending the process.")
                 logger.info("\n***END_ASSESS_FEEDBACK***\n\n")
                 return "end"
+
+            else:
+                lm = dspy.LM('openai/gpt-4o-mini', api_key=os.getenv("OPENAI_API_KEY"), temperature=0.)
+                dspy.configure(lm=lm)
+                feedback_assessor = dspy.Predict(FeedbackAssessorSignature)
+                assessment = feedback_assessor(feedback=state['feedback'])
+                logger.info(f"Feedback assessment result: {assessment}")
+                logger.info("\n***END_ASSESS_FEEDBACK***\n\n")
+                return assessment['output']
 
         def refine_answer(state: SciQAgentState):
             """
@@ -161,9 +166,10 @@ class SciQAgent:
                                     generated_answer=state['generated_answer'],
                                     feedback=state['feedback'])['refined_answer']
             logger.info(f"Refined answer: {answer}")
+            logger.info(f"refinement count: {state['refinement_count']}")
             logger.info("\n***END_REFINE_ANSWER***\n\n")
 
-            return {'generated_answer': answer}
+            return {'generated_answer': answer, 'refinement_count': state['refinement_count'] + 1}
 
         def retrieve_documents(state: SciQAgentState):
             """
@@ -209,7 +215,21 @@ class SciQAgent:
 
             logger.info("\n***END_GENERATE_ANSWER***\n\n")
 
-            return {'generated_answer': answer, "messages": [{"role": "assistant", "content": answer}]}
+            return {'generated_answer': answer}
+
+        def conclude(state: SciQAgentState):
+            """
+            Concludes the conversation and returns the final state.
+
+            Args:
+                state (SciQAgentState): The current state of the RAG agent.
+
+            Returns:
+                dict: The final state after processing.
+            """
+            logger.info("\n\n***CONCLUDE***\n")
+            return {"messages": [{"role": "assistant", "content": state['generated_answer']}]}
+            logger.info("\n***END_CONCLUDE***\n\n")
 
         print("Creating RAG Agent graph...")
         # Define graph workflow
@@ -219,6 +239,7 @@ class SciQAgent:
         workflow.add_node("generate_answer", generate_answer)
         workflow.add_node("generate_feedback", generate_feedback)
         workflow.add_node("refine_answer", refine_answer)
+        workflow.add_node("conclude", conclude)
 
         workflow.add_conditional_edges(
             START,
@@ -241,11 +262,12 @@ class SciQAgent:
             assess_feedback,
             {
                 "refine": "refine_answer",
-                "end": END,
+                "end": "conclude",
             },
         )
         # refine_answer to assess_answer
         workflow.add_edge("refine_answer", "generate_feedback")
+        workflow.add_edge("conclude", END)
 
         print("RAG Agent graph created successfully.")
 
